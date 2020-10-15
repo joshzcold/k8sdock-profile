@@ -12,8 +12,10 @@ resources:
 ```
 
 Result:
-cpu => throttled to mhz / % of a single core on k8s node
-ram => if exceeding limit then restart container
+
+cpu => throttled to mhz and or % of a single core on k8s node
+
+ram => if exceeding limit then kill/restart container
 
 If you are deploying an application you yourself did not create then it can be tricky 
 to determine how much cpu and ram to allocate
@@ -21,7 +23,7 @@ to determine how much cpu and ram to allocate
 This script will give you an accurate stats on either docker containers or k8s pods 
 over the course of their workload so you can make better decisions on your resource requests
 
-This script output the max utilized CPU and RAM in mb/mhz
+This script will output the max utilized CPU and RAM in mb/mhz
 
 If you are deploying for one of these scenarios then this script can be helpful:
 
