@@ -10,8 +10,25 @@ con_map = {}
 
 
 def signal_handler(sig, frame):
+    # if args.file write to that file instead of the default
     if args.file:
         print('\n writing to file ==> ', args.file)
+        f = open(args.file)
+        content = ""
+        if args.docker:
+            for key, value in con_map.items():
+                # Consistent Tabbing between rows. look into print.format()
+                # Maybe some colors???
+                print(f"{key} ==> {value}")
+                content += f"docker container: {key} {0: <16} max cpu: {value['mhz']}mhz max ram {value['mb']}mb image: {value['image']}  id: {value['id']}\n"
+        else:
+            for key, value in stat_map.items():
+                print(f"{key} ==> {value}")
+                content += f"k8s pod name: {key} {0: <16} cpu: {value['cpu']}mhz mem: {value['mem']}Mi \n"
+        content.format()
+        f.write(content)
+        f.close()
+
     else:
         file = f"k8s-dock.profile"
         print('\n writing to file ==> ', file)
@@ -19,6 +36,8 @@ def signal_handler(sig, frame):
         content = ""
         if args.docker:
             for key, value in con_map.items():
+                # Consistent Tabbing between rows. look into print.format()
+                # Maybe some colors??? 
                 print(f"{key} ==> {value}")
                 content += f"docker container: {key} {0: <16} max cpu: {value['mhz']}mhz max ram {value['mb']}mb image: {value['image']}  id: {value['id']}\n"
         else:
@@ -54,14 +73,18 @@ def profile_docker():
                 "mhz": 0.0,
                 "mb": 0.0
             }
+
     while True:
         for con_name, con_val in con_map.items():
             try:
-                cpu_file = open(f"/sys/fs/cgroup/cpu,cpuacct/docker/{con_val['id']}/cpuacct.usage_percpu")
+                paths = [line[0:].decode("utf-8") for line in subprocess.check_output(f"find /sys/fs/cgroup -iname {con_val['id']} || true", shell=True).splitlines()]
+                paths_dct = {paths[i].split("/")[4]: paths[i] for i in range(0, len(paths))}
+
+                cpu_file = open(paths_dct["cpu,cpuacct"] + "/cpuacct.usage_percpu")
                 cpu_stats = cpu_file.read()
                 cpu_file.close()
 
-                ram_file = open(f"/sys/fs/cgroup/memory/docker/{con_val['id']}/memory.max_usage_in_bytes")
+                ram_file = open(paths_dct["memory"] + "/memory.max_usage_in_bytes")
                 ram_stats = float(ram_file.read())
                 ram_file.close()
                 # Megabytes = Bytes ÷ 1,048,576
@@ -98,6 +121,18 @@ def profile_docker():
                         a = con.split()
                         if con_name is a[1]:
                             con_map[a[1]]["id"] = a[0]
+            except KeyError:
+                print(f"Key Error Attempting to replace: Container Name:{con_name} Container Data:{con_val} Container Paths:{paths_dct}")
+                list_command = 'docker container ls --no-trunc --format "{{.ID}} {{.Names}} {{.Image}}"'
+                normal = subprocess.Popen(list_command, stdout=subprocess.PIPE, shell=True)
+                containers = normal.communicate()[0].decode("utf-8").split("\n")
+                for con in containers:
+                    if con:
+                        a = con.split()
+                        if con_name is a[1]:
+                            con_map[a[1]]["id"] = a[0]
+            except Exception as err:
+                print(f"Exception! something went wrong but im continuing {err}")
 
 
 def profile_k8s():
@@ -143,6 +178,7 @@ if __name__ == "__main__":
     if args.docker:
         profile_docker()
     if args.kubernetes:
+        # We need to fix the OS path is file
         if not os.environ.get("KUBECONFIG") and not os.path.isfile("~/.kube/config"):
             raise Exception("KUBECONFIG env var and ~/.kube/config not set")
         profile_k8s()
