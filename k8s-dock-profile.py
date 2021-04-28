@@ -43,6 +43,9 @@ def parse_int(string):
 def profile_docker():
     print("Profiling docker containers on local machine")
     list_command = 'docker container ls --no-trunc --format "{{.ID}} {{.Names}} {{.Image}}"'
+    if args.search:
+        list_command += f"| grep {args.search}"
+    print(list_command)
     normal = subprocess.Popen(list_command, stdout=subprocess.PIPE, shell=True)
     containers = normal.communicate()[0].decode("utf-8")
     containers = [line for line in containers.split('\n') if line.strip() != '']
